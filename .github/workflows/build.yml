@@ -38,17 +38,21 @@ jobs:
       run: |
         gradle -v
         
+        # 1. Создаем базовую структуру проекта
         cordova create build_dir com.custom.batteryguard BatteryGuard
         rm -rf build_dir/www
         cp -r www build_dir/
         cp config.xml build_dir/config.xml
+        
+        # 2. Переходим в проект и ставим плагин с платформой
         cd build_dir
         cordova plugin add ../local-plugins/cordova-plugin-battery-guard --local
         cordova platform add android@9.1.0
         
-        # Исправляем мертвый jcenter на живой mavenCentral во всех gradle-файлах проекта
+        # 3. Находясь ВНУТРИ build_dir, заменяем репозитории (теперь папка platforms/android точно на месте)
         find platforms/android/ -name "*.gradle" -exec sed -i 's/jcenter()/mavenCentral()/g' {} +
         
+        # 4. Запускаем компиляцию
         cordova build android --debug
 
     - name: Upload Finished APK
