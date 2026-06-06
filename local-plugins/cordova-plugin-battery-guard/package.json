@@ -1,0 +1,17 @@
+﻿{
+  "name": "cordova-plugin-battery-guard",
+  "version": "1.0.0",
+  "description": "Native Battery Guard Foreground Service for Android",
+  "cordova": {
+    "id": "cordova-plugin-battery-guard",
+    "platforms": [
+      "android"
+    ]
+  },
+  "keywords": [
+    "ecosystem:cordova",
+    "cordova-android"
+  ],
+  "author": "Custom Dev",
+  "license": "MIT"
+}
