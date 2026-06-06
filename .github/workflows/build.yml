@@ -30,6 +30,11 @@ jobs:
 
     - name: Create Cordova Project and Build
       run: |
+        # Полностью удаляем предустановленный несовместимый Gradle из системы
+        sudo rm -f /usr/bin/gradle
+        sudo rm -rf /usr/share/gradle-9.5.1
+        
+        # Запускаем стандартный цикл сборки
         cordova create build_dir com.custom.batteryguard BatteryGuard
         rm -rf build_dir/www
         cp -r www build_dir/
@@ -37,6 +42,4 @@ jobs:
         cd build_dir
         cordova plugin add ../local-plugins/cordova-plugin-battery-guard --local
         cordova platform add android@9.1.0
-        
-        # Принудительно заставляем Cordova использовать локальный совместимый Gradle Wrapper вместо серверного
-        cordova build android --debug -- --gradleArg=-Pandroid.useDeprecatedNdk=true
+        cordova build android --debug
