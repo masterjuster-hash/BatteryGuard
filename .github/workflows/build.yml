@@ -26,10 +26,8 @@ jobs:
 
     - name: Install Compatible Gradle 7.1.1
       run: |
-        # Скачиваем официальный дистрибутив Gradle, совместимый с Java 8
         wget -q https://services.gradle.org/distributions/gradle-7.1.1-bin.zip
         sudo unzip -q gradle-7.1.1-bin.zip -d /opt
-        # Добавляем его в PATH для текущей сессии
         echo "/opt/gradle-7.1.1/bin" >> $GITHUB_PATH
 
     - name: Install Cordova and Tools
@@ -38,7 +36,6 @@ jobs:
 
     - name: Create Cordova Project and Build
       run: |
-        # Проверяем, что теперь подхватывается правильная версия gradle
         gradle -v
         
         cordova create build_dir com.custom.batteryguard BatteryGuard
@@ -48,6 +45,10 @@ jobs:
         cd build_dir
         cordova plugin add ../local-plugins/cordova-plugin-battery-guard --local
         cordova platform add android@9.1.0
+        
+        # Исправляем мертвый jcenter на живой mavenCentral во всех gradle-файлах проекта
+        find platforms/android/ -name "*.gradle" -exec sed -i 's/jcenter()/mavenCentral()/g' {} +
+        
         cordova build android --debug
 
     - name: Upload Finished APK
