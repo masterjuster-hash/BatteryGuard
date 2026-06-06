@@ -24,17 +24,23 @@ jobs:
       with:
         node-version: '16'
 
+    - name: Install Compatible Gradle 7.1.1
+      run: |
+        # Скачиваем официальный дистрибутив Gradle, совместимый с Java 8
+        wget -q https://services.gradle.org/distributions/gradle-7.1.1-bin.zip
+        sudo unzip -q gradle-7.1.1-bin.zip -d /opt
+        # Добавляем его в PATH для текущей сессии
+        echo "/opt/gradle-7.1.1/bin" >> $GITHUB_PATH
+
     - name: Install Cordova and Tools
       run: |
         npm install -g cordova@10.0.0
 
     - name: Create Cordova Project and Build
       run: |
-        # Полностью удаляем предустановленный несовместимый Gradle из системы
-        sudo rm -f /usr/bin/gradle
-        sudo rm -rf /usr/share/gradle-9.5.1
+        # Проверяем, что теперь подхватывается правильная версия gradle
+        gradle -v
         
-        # Запускаем стандартный цикл сборки
         cordova create build_dir com.custom.batteryguard BatteryGuard
         rm -rf build_dir/www
         cp -r www build_dir/
@@ -43,3 +49,9 @@ jobs:
         cordova plugin add ../local-plugins/cordova-plugin-battery-guard --local
         cordova platform add android@9.1.0
         cordova build android --debug
+
+    - name: Upload Finished APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: BatteryGuard-APK
+        path: build_dir/platforms/android/app/build/outputs/apk/debug/app-debug.apk
