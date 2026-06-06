@@ -1,0 +1,35 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        id="cordova-plugin-battery-guard"
+        version="1.0.0">
+    <name>BatteryGuardPlugin</name>
+    <description>Native Battery Guard Foreground Service for Android</description>
+    <license>MIT</license>
+
+    <js-module src="www/BatteryGuard.js" name="BatteryGuard">
+        <clobbers target="cordova.plugins.BatteryGuard" />
+    </js-module>
+
+    <platform name="android">
+        <config-file target="res/xml/config.xml" parent="/*">
+            <feature name="BatteryGuardPlugin">
+                <param name="android-package" value="com.custom.batteryguard.BatteryGuardPlugin" />
+            </feature>
+        </config-file>
+
+        <config-file target="AndroidManifest.xml" parent="/manifest">
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+            <uses-permission android:name="android.permission.WAKE_LOCK" />
+        </config-file>
+
+        <config-file target="AndroidManifest.xml" parent="/manifest/application">
+            <service android:name="com.custom.batteryguard.BatteryForegroundService" 
+                     android:enabled="true" 
+                     android:exported="false" />
+        </config-file>
+
+        <source-file src="src/android/BatteryGuardPlugin.java" target-dir="src/com/custom/batteryguard" />
+        <source-file src="src/android/BatteryForegroundService.java" target-dir="src/com/custom/batteryguard" />
+    </platform>
+</plugin>
