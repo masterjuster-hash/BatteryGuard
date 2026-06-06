@@ -2,9 +2,35 @@
 const path = require('path');
 
 module.exports = function(context) {
-    const platformRoot = path.join(context.opts.projectRoot, 'platforms/android');
+    const projectRoot = context.opts.projectRoot;
+    const platformRoot = path.join(projectRoot, 'platforms/android');
     if (!fs.existsSync(platformRoot)) return;
 
+    // 1. Создаем локальную Java-заглушку для обмана Cordova import
+    const targetDir = path.join(platformRoot, 'CordovaLib/src/main/java/com/g00fy2/versioncompare');
+    const targetFile = path.join(targetDir, 'Version.java');
+
+    try {
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+        }
+        
+        const javaDummyCode = `package com.g00fy2.versioncompare;
+public class Version {
+    private String v;
+    public Version(String version) { this.v = version; }
+    public boolean isHigherThan(String other) { return false; }
+    public boolean isLowerThan(String other) { return false; }
+    public int compareTo(Version other) { return 0; }
+}`;
+        
+        fs.writeFileSync(targetFile, javaDummyCode, 'utf8');
+        console.log('--- [Hook] Dummy Version.java successfully generated.');
+    } catch (e) {
+        console.error('--- [Hook] Failed to create Java dummy:', e);
+    }
+
+    // 2. Исправляем репозитории в gradle-файлах
     function walk(dir) {
         let results = [];
         const list = fs.readdirSync(dir);
@@ -24,24 +50,8 @@ module.exports = function(context) {
         const gradleFiles = walk(platformRoot);
         gradleFiles.forEach(file => {
             let content = fs.readFileSync(file, 'utf8');
-            let changed = false;
-            
-            // 1. Исправляем репозитории jcenter
             if (content.includes('jcenter()')) {
                 content = content.replace(/jcenter\(\)/g, 'mavenCentral()');
-                changed = true;
-            }
-            
-            // 2. Вырезаем под корень сломанную зависимость versioncompare
-            if (content.includes('com.g00fy2:versioncompare')) {
-                // Удаляем всю строку, где упоминается эта библиотека
-                const lines = content.split('\n');
-                const filteredLines = lines.filter(line => !line.includes('com.g00fy2:versioncompare'));
-                content = filteredLines.join('\n');
-                changed = true;
-            }
-
-            if (changed) {
                 fs.writeFileSync(file, content, 'utf8');
             }
         });
