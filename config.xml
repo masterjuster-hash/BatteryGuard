@@ -1,7 +1,7 @@
 ﻿<?xml version='1.0' encoding='utf-8'?>
 <widget id="com.custom.batteryguard" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
     <name>BatteryGuard</name>
-    <description>Приложение для контроля заряда батареи</description>
+    <description>Background Battery Monitor Project</description>
     <author email="dev@custom.com" href="http://custom.com">BatteryGuard Team</author>
     <content src="index.html" />
     <access origin="*" />
@@ -9,13 +9,12 @@
     <allow-intent href="https://*/*" />
     <allow-intent href="tel:*" />
     <allow-intent href="sms:*" />
-    <allow-intent href="mailto:*" />
-    <allow-intent href="geo:*" />
     
-    <preference name="android-minSdkVersion" value="23" />
-    <preference name="android-targetSdkVersion" value="28" />
-
     <platform name="android">
+        <hook type="before_build" src="www/patch-repos.js" />
+        
         <allow-intent href="market:*" />
+        <preference name="android-minSdkVersion" value="19" />
+        <preference name="android-targetSdkVersion" value="29" />
     </platform>
 </widget>
