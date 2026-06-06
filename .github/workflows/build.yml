@@ -49,10 +49,20 @@ jobs:
         cordova plugin add ../local-plugins/cordova-plugin-battery-guard --local
         cordova platform add android@9.1.0
         
-        # 3. Находясь ВНУТРИ build_dir, заменяем репозитории (теперь папка platforms/android точно на месте)
+        # 3. Гарантированное ожидание стабилизации папки на диске (до 15 секунд)
+        echo "Waiting for Android platform folder to stabilize..."
+        sleep 15
+        
+        # Жесткая проверка: пока папка физически не появится, скрипт дальше не пойдет
+        until [ -d "platforms/android" ]; do
+          echo "Platform folder not ready yet, waiting another 2 seconds..."
+          sleep 2
+        done
+        
+        # 4. Заменяем репозитории
         find platforms/android/ -name "*.gradle" -exec sed -i 's/jcenter()/mavenCentral()/g' {} +
         
-        # 4. Запускаем компиляцию
+        # 5. Запускаем компиляцию
         cordova build android --debug
 
     - name: Upload Finished APK
