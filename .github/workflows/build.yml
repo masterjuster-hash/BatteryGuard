@@ -46,16 +46,11 @@ jobs:
         
         cd build_dir
         
-        # 2. Сначала ставим чистую платформу БЕЗ плагинов (папка гарантированно создается сразу)
+        # 2. Добавляем платформу и плагин (теперь они разворачиваются штатно)
         cordova platform add android@9.1.0
-        
-        # 3. Сразу чиним репозитории, пока gradle не начал ничего скачивать
-        find platforms/android/ -name "*.gradle" -exec sed -i 's/jcenter()/mavenCentral()/g' {} +
-        
-        # 4. И только теперь накатываем наш плагин
         cordova plugin add ../local-plugins/cordova-plugin-battery-guard --local
         
-        # 5. Запускаем компиляцию
+        # 3. Запускаем компиляцию (Cordova сама вызовет хук patch-repos.js перед вызовом gradle)
         cordova build android --debug
 
     - name: Upload Finished APK
