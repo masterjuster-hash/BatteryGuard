@@ -44,23 +44,16 @@ jobs:
         cp -r www build_dir/
         cp config.xml build_dir/config.xml
         
-        # 2. Переходим в проект и ставим плагин с платформой
         cd build_dir
-        cordova plugin add ../local-plugins/cordova-plugin-battery-guard --local
+        
+        # 2. Сначала ставим чистую платформу БЕЗ плагинов (папка гарантированно создается сразу)
         cordova platform add android@9.1.0
         
-        # 3. Гарантированное ожидание стабилизации папки на диске (до 15 секунд)
-        echo "Waiting for Android platform folder to stabilize..."
-        sleep 15
-        
-        # Жесткая проверка: пока папка физически не появится, скрипт дальше не пойдет
-        until [ -d "platforms/android" ]; do
-          echo "Platform folder not ready yet, waiting another 2 seconds..."
-          sleep 2
-        done
-        
-        # 4. Заменяем репозитории
+        # 3. Сразу чиним репозитории, пока gradle не начал ничего скачивать
         find platforms/android/ -name "*.gradle" -exec sed -i 's/jcenter()/mavenCentral()/g' {} +
+        
+        # 4. И только теперь накатываем наш плагин
+        cordova plugin add ../local-plugins/cordova-plugin-battery-guard --local
         
         # 5. Запускаем компиляцию
         cordova build android --debug
