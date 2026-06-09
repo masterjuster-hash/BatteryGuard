@@ -5,7 +5,27 @@ module.exports = function(context) {
     const platformRoot = path.join(context.opts.projectRoot, 'platforms/android');
     if (!fs.existsSync(platformRoot)) return;
 
-    // Специфический фикс для конкретного файла app/build.gradle, который валит сборку
+    // 1. ТОТАЛЬНАЯ ПЕРЕЗАПИСЬ cordova.gradle (уничтожаем ломающий скрипт под корень)
+    const cordovaGradlePath = path.join(platformRoot, 'CordovaLib/cordova.gradle');
+    if (fs.existsSync(cordovaGradlePath)) {
+        try {
+            const cleanCordovaGradle = `// Patched by infrastructure hook
+            Boolean isSupportedVersion(String version) { return true; }
+            String findLatestInstalledBuildTools(String buildToolsVersion) { return buildToolsVersion; }
+            
+            ext {
+                cdvCompileSdkVersion = privateHelpers.getCompileSdkVersion()
+                cdvBuildToolsVersion = privateHelpers.getBuildToolsVersion()
+            }
+            `;
+            fs.writeFileSync(cordovaGradlePath, cleanCordovaGradle, 'utf8');
+            console.log('--- [Hook] cordova.gradle has been completely overwritten with clean stub.');
+        } catch (e) {
+            console.error('--- [Hook] Failed to overwrite cordova.gradle:', e);
+        }
+    }
+
+    // 2. Очистка app/build.gradle от блокера
     const appBuildGradle = path.join(platformRoot, 'app/build.gradle');
     if (fs.existsSync(appBuildGradle)) {
         try {
@@ -23,6 +43,7 @@ module.exports = function(context) {
         }
     }
 
+    // 3. Массовая замена репозиториев jcenter -> mavenCentral во всех файлах
     function walk(dir) {
         let results = [];
         const list = fs.readdirSync(dir);
@@ -44,26 +65,6 @@ module.exports = function(context) {
             let content = fs.readFileSync(file, 'utf8');
             let changed = false;
 
-            // ХИРУРГИЯ: Полностью вырезаем логику сравнения версий Cordova из cordova.gradle
-            if (file.endsWith('cordova.gradle')) {
-                content = content.replace(/import com\.g00fy2\.versioncompare\.Version/g, '// Removed');
-                
-                const targetFunc1 = 'Boolean isSupportedVersion(String version) {';
-                if (content.indexOf(targetFunc1) !== -1) {
-                    content = content.replace(/Boolean isSupportedVersion\(String version\) \{[\s\S]*?\n\}/, 
-                        'Boolean isSupportedVersion(String version) {\n    return true;\n}');
-                }
-
-                const targetFunc2 = 'String findLatestInstalledBuildTools(String buildToolsVersion) {';
-                if (content.indexOf(targetFunc2) !== -1) {
-                    content = content.replace(/String findLatestInstalledBuildTools\(String buildToolsVersion\) \{[\s\S]*?\n\}/,
-                        'String findLatestInstalledBuildTools(String buildToolsVersion) {\n    return buildToolsVersion;\n}');
-                }
-                
-                changed = true;
-            }
-
-            // Общая очистка от упоминаний во всех остальных файлах
             if (content.indexOf('com.g00fy2:versioncompare') !== -1) {
                 let lines = content.split('\n');
                 let filteredLines = lines.filter(function(line) {
@@ -73,7 +74,6 @@ module.exports = function(context) {
                 changed = true;
             }
 
-            // Заменяем мертвый jcenter на mavenCentral
             if (content.indexOf('jcenter()') !== -1) {
                 content = content.split('jcenter()').join('mavenCentral()');
                 changed = true;
@@ -81,10 +81,10 @@ module.exports = function(context) {
 
             if (changed) {
                 fs.writeFileSync(file, content, 'utf8');
-                console.log('Successfully hard-patched: ' + path.basename(file));
+                console.log('Successfully patched: ' + path.basename(file));
             }
         });
     } catch (err) {
-        console.error('Error in hard-patch hook: ' + err);
+        console.error('Error in walk patch hook: ' + err);
     }
 };
