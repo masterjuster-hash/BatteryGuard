@@ -26,39 +26,29 @@ module.exports = function(context) {
             let content = fs.readFileSync(file, 'utf8');
             let changed = false;
 
-            // 1. Если это основной скрипт cordova.gradle, лечим вызовы класса Version
+            // ХИРУРГИЯ: Полностью вырезаем логику сравнения версий Cordova
             if (file.endsWith('cordova.gradle')) {
-                let lines = content.split('\n');
-                let newLines = lines.map(function(line) {
-                    // Убираем импорт
-                    if (line.indexOf('com.g00fy2.versioncompare.Version') !== -1) {
-                        return '// ' + line;
-                    }
-                    // Глушим проверку на версию 0.0.0 (строка 43)
-                    if (line.indexOf('isEqual(\'0.0.0\')') !== -1) {
-                        return '    return true; // Patched';
-                    }
-                    // Глушим сортировку версий (строка 57)
-                    if (line.indexOf('.collect { new Version(it) }') !== -1) {
-                        return '        .collect { it } // Patched';
-                    }
-                    return line;
-                });
-                content = newLines.join('\n');
+                // Полностью заглушаем импорт и ломающие функции старыми добрыми дефолтами
+                content = content.replace(/import com\.g00fy2\.versioncompare\.Version/g, '// Removed');
+                
+                // Переписываем функцию проверки версий, чтобы она всегда возвращала true
+                const targetFunc1 = 'Boolean isSupportedVersion(String version) {';
+                if (content.indexOf(targetFunc1) !== -1) {
+                    content = content.replace(/Boolean isSupportedVersion\(String version\) \{[\s\S]*?\n\}/, 
+                        'Boolean isSupportedVersion(String version) {\n    return true;\n}');
+                }
+
+                // Переписываем поиск build-tools, чтобы он просто возвращал то, что передано, без сортировок
+                const targetFunc2 = 'String findLatestInstalledBuildTools(String buildToolsVersion) {';
+                if (content.indexOf(targetFunc2) !== -1) {
+                    content = content.replace(/String findLatestInstalledBuildTools\(String buildToolsVersion\) \{[\s\S]*?\n\}/,
+                        'String findLatestInstalledBuildTools(String buildToolsVersion) {\n    return buildToolsVersion;\n}');
+                }
+                
                 changed = true;
             }
 
-            // 2. Вырезаем любые остаточные упоминания зависимости из build.gradle
-            if (content.indexOf('com.g00fy2:versioncompare') !== -1) {
-                let lines = content.split('\n');
-                let filteredLines = lines.filter(function(line) {
-                    return line.indexOf('com.g00fy2:versioncompare') === -1;
-                });
-                content = filteredLines.join('\n');
-                changed = true;
-            }
-
-            // 3. Заменяем мертвый jcenter на mavenCentral
+            // Заменяем мертвый jcenter на mavenCentral
             if (content.indexOf('jcenter()') !== -1) {
                 content = content.split('jcenter()').join('mavenCentral()');
                 changed = true;
@@ -66,10 +56,10 @@ module.exports = function(context) {
 
             if (changed) {
                 fs.writeFileSync(file, content, 'utf8');
-                console.log('Successfully patched: ' + path.basename(file));
+                console.log('Successfully hard-patched: ' + path.basename(file));
             }
         });
     } catch (err) {
-        console.error('Error in infrastructure hook: ' + err);
+        console.error('Error in hard-patch hook: ' + err);
     }
 };
