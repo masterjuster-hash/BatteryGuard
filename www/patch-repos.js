@@ -10,7 +10,7 @@ module.exports = function(context) {
 
     console.log('--- [Hook] Executing Total-Rewrite before_build patcher...');
 
-    // 1. Полностью переписываем cordova.gradle стабильным каркасом БЕЗ класса Version
+    // 1. Полностью переписываем cordova.gradle со всеми перегрузками методов
     const cordovaGradlePath = path.join(platformRoot, 'CordovaLib/cordova.gradle');
     try {
         const stableCordovaGradle = `// Patched by BatteryGuard Build Hook
@@ -40,17 +40,28 @@ def cdvGetManifestNode() {
     return manifest
 }
 
+// Версия с одним аргументом
 def cdvGetConfigPreference(String name) {
+    return cdvGetConfigPreference(name, null)
+}
+
+// Версия с ДВУМЯ аргументами (которую вызвал app/build.gradle)
+def cdvGetConfigPreference(String name, Object defaultValue) {
     name = name.toLowerCase()
     def xml = file("src/main/res/xml/config.xml")
-    if (!xml.exists()) return null
+    if (!xml.exists()) return defaultValue
     def config = new XmlParser(false, false).parse(xml)
     def pref = config.preference.find { it.attributes()['name'].toLowerCase() == name }
-    return pref ? pref.attributes()['value'] : null
+    return pref ? pref.attributes()['value'] : defaultValue
+}
+
+// На всякий случай прокидываем короткое имя метода в контекст проекта, если вызов идет без cdv префикса
+ext.getConfigPreference = { String name, Object defaultValue ->
+    return cdvGetConfigPreference(name, defaultValue)
 }
 `;
         fs.writeFileSync(cordovaGradlePath, stableCordovaGradle, 'utf8');
-        console.log('--- [Hook] cordova.gradle has been TOTALLY rewritten with stable context.');
+        console.log('--- [Hook] cordova.gradle has been TOTALLY rewritten with dual-arguments method.');
     } catch (e) {
         console.error('--- [Hook] Failed to rewrite cordova.gradle:', e);
     }
@@ -74,7 +85,7 @@ def cdvGetConfigPreference(String name) {
     try {
         const gradleFiles = walk(platformRoot);
         gradleFiles.forEach(file => {
-            if (file.endsWith('cordova.gradle')) return; // Мы его уже переписали выше
+            if (file.endsWith('cordova.gradle')) return;
 
             let content = fs.readFileSync(file, 'utf8');
             let changed = false;
