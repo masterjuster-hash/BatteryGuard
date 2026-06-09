@@ -44,7 +44,7 @@ module.exports = function(context) {
             let content = fs.readFileSync(file, 'utf8');
             let changed = false;
 
-            // Полностью вырезаем логику сравнения версий Cordova из cordova.gradle
+            // ХИРУРГИЯ: Полностью вырезаем логику сравнения версий Cordova из cordova.gradle
             if (file.endsWith('cordova.gradle')) {
                 content = content.replace(/import com\.g00fy2\.versioncompare\.Version/g, '// Removed');
                 
