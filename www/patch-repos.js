@@ -5,27 +5,28 @@ module.exports = function(context) {
     const platformRoot = path.join(context.opts.projectRoot, 'platforms/android');
     if (!fs.existsSync(platformRoot)) return;
 
-    // 1. ТОТАЛЬНАЯ ПЕРЕЗАПИСЬ cordova.gradle (уничтожаем ломающий скрипт под корень)
+    // 1. ПЕРЕЗАПИСЬ cordova.gradle БЕЗ privateHelpers (чистый хардкод версий SDK)
     const cordovaGradlePath = path.join(platformRoot, 'CordovaLib/cordova.gradle');
     if (fs.existsSync(cordovaGradlePath)) {
         try {
             const cleanCordovaGradle = `// Patched by infrastructure hook
-            Boolean isSupportedVersion(String version) { return true; }
-            String findLatestInstalledBuildTools(String buildToolsVersion) { return buildToolsVersion; }
-            
-            ext {
-                cdvCompileSdkVersion = privateHelpers.getCompileSdkVersion()
-                cdvBuildToolsVersion = privateHelpers.getBuildToolsVersion()
-            }
-            `;
+Boolean isSupportedVersion(String version) { return true; }
+String findLatestInstalledBuildTools(String buildToolsVersion) { return buildToolsVersion; }
+
+ext {
+    // Жестко выставляем целевые параметры под Android Target 29
+    cdvCompileSdkVersion = 29
+    cdvBuildToolsVersion = "29.0.2"
+}
+`;
             fs.writeFileSync(cordovaGradlePath, cleanCordovaGradle, 'utf8');
-            console.log('--- [Hook] cordova.gradle has been completely overwritten with clean stub.');
+            console.log('--- [Hook] cordova.gradle rewritten with solid SDK properties.');
         } catch (e) {
             console.error('--- [Hook] Failed to overwrite cordova.gradle:', e);
         }
     }
 
-    // 2. Очистка app/build.gradle от блокера
+    // 2. Очистка app/build.gradle от блокера versioncompare
     const appBuildGradle = path.join(platformRoot, 'app/build.gradle');
     if (fs.existsSync(appBuildGradle)) {
         try {
@@ -43,7 +44,7 @@ module.exports = function(context) {
         }
     }
 
-    // 3. Массовая замена репозиториев jcenter -> mavenCentral во всех файлах
+    // 3. Массовая замена репозиториев jcenter -> mavenCentral во всех файлах .gradle
     function walk(dir) {
         let results = [];
         const list = fs.readdirSync(dir);
