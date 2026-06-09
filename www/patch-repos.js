@@ -1,4 +1,6 @@
-﻿const fs = require('fs');
+﻿JavaScript
+
+const fs = require('fs');
 const path = require('path');
 
 module.exports = function(context) {
@@ -6,31 +8,32 @@ module.exports = function(context) {
     const platformRoot = path.join(projectRoot, 'platforms/android');
     if (!fs.existsSync(platformRoot)) return;
 
-    // 1. Создаем локальную Java-заглушку для обмана Cordova import
-    const targetDir = path.join(platformRoot, 'CordovaLib/src/main/java/com/g00fy2/versioncompare');
-    const targetFile = path.join(targetDir, 'Version.java');
-
-    try {
-        if (!fs.existsSync(targetDir)) {
-            fs.mkdirSync(targetDir, { recursive: true });
+    // 1. Хирургически отключаем проверку версий внутри CordovaLib, чтобы не зависеть от библиотеки
+    const cordovaGradlePath = path.join(platformRoot, 'CordovaLib/cordova.gradle');
+    if (fs.existsSync(cordovaGradlePath)) {
+        try {
+            let cordovaGradleContent = fs.readFileSync(cordovaGradlePath, 'utf8');
+            
+            // Комментируем импорт
+            cordovaGradleContent = cordovaGradleContent.replace(
+                "import com.g00fy2.versioncompare.Version",
+                "// import com.g00fy2.versioncompare.Version"
+            );
+            
+            // Ломаем/заменяем логику вызова, чтобы она всегда возвращала true (типа версия всегда подходит)
+            cordovaGradleContent = cordovaGradleContent.replace(
+                "return new Version(versionString).isHigherThan(lowestVersion);",
+                "return true; // Patched by Hook"
+            );
+            
+            fs.writeFileSync(cordovaGradlePath, cordovaGradleContent, 'utf8');
+            console.log('--- [Hook] CordovaLib/cordova.gradle successfully patched (disabled versioncompare).');
+        } catch (e) {
+            console.error('--- [Hook] Failed to patch cordova.gradle:', e);
         }
-        
-        const javaDummyCode = `package com.g00fy2.versioncompare;
-public class Version {
-    private String v;
-    public Version(String version) { this.v = version; }
-    public boolean isHigherThan(String other) { return false; }
-    public boolean isLowerThan(String other) { return false; }
-    public int compareTo(Version other) { return 0; }
-}`;
-        
-        fs.writeFileSync(targetFile, javaDummyCode, 'utf8');
-        console.log('--- [Hook] Dummy Version.java successfully generated.');
-    } catch (e) {
-        console.error('--- [Hook] Failed to create Java dummy:', e);
     }
 
-    // 2. Исправляем репозитории и принудительно повышаем версию библиотеки в gradle-файлах
+    // 2. Исправляем репозитории и вырезаем classpath зависимость из всех build.gradle
     function walk(dir) {
         let results = [];
         const list = fs.readdirSync(dir);
@@ -49,31 +52,19 @@ public class Version {
     try {
         const gradleFiles = walk(platformRoot);
         gradleFiles.forEach(file => {
+            // Пропускаем уже обработанный cordova.gradle
+            if (file.endsWith('cordova.gradle')) return;
+
             let content = fs.readFileSync(file, 'utf8');
             let changed = false;
 
-            // Чиним репозитории
+            // Чиням репозитории на mavenCentral
             if (content.includes('jcenter()')) {
                 content = content.replace(/jcenter\(\)/g, 'mavenCentral()');
                 changed = true;
             }
 
-            // Жестко форсируем живую версию 1.3.7 вместо мертвой 1.3.4
-            if (content.includes('buildscript {') && !content.includes('resolutionStrategy.force')) {
-                const forceCode = `buildscript {
-    configurations.all {
-        resolutionStrategy.force 'com.g00fy2:versioncompare:1.3.7'
-    }`;
-                content = content.replace('buildscript {', forceCode);
-                changed = true;
-            }
-
-            if (changed) {
-                fs.writeFileSync(file, content, 'utf8');
-                console.log(`--- [Hook] Applied force version rule to: ${path.basename(file)}`);
-            }
-        });
-    } catch (err) {
-        console.error('--- [Hook] Error while modifying gradle files:', err);
-    }
-};
+            // Вырезаем требование подгрузки плагина из блока buildscript dependencies classpath
+            if (content.includes('com.g00fy2:versioncompare')) {
+                const lines = content.split('\n');
+                const filteredLines = lines.filter(line => !line.includes
