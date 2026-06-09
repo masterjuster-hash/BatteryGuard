@@ -8,65 +8,48 @@ module.exports = function(context) {
         return;
     }
 
-    console.log('--- [Hook] Executing Total-Rewrite before_build patcher...');
+    console.log('--- [Hook] Executing Precision-Surgical before_build patcher...');
 
-    // 1. Полностью переписываем cordova.gradle со всеми перегрузками методов
+    // 1. Возвращаем оригинальный файл, но аккуратно срезаем верхушку с Version
     const cordovaGradlePath = path.join(platformRoot, 'CordovaLib/cordova.gradle');
-    try {
-        const stableCordovaGradle = `// Patched by BatteryGuard Build Hook
-import java.util.regex.Pattern
+    if (fs.existsSync(cordovaGradlePath)) {
+        try {
+            let content = fs.readFileSync(cordovaGradlePath, 'utf8');
+            let changed = false;
 
-// Глобальные объекты, которые ищет app/build.gradle
-ext.cdvHelpers = this
-ext.privateHelpers = this
+            // Глушим мертвый импорт
+            if (content.indexOf('import com.g00fy2.versioncompare.Version') !== -1) {
+                content = content.split('import com.g00fy2.versioncompare.Version').join('// Removed');
+                changed = true;
+            }
 
-Boolean isSupportedVersion(String version) {
-    return true
-}
+            // Находим ломающие методы и полностью заменяем их тела на безопасные заглушки
+            if (content.indexOf('Boolean isSupportedVersion(String version) {') !== -1 && content.indexOf('// Patched OK') === -1) {
+                
+                // Нагло и точечно подменяем код методов, не ломая окружение вокруг них
+                content = content.replace(
+                    /Boolean isSupportedVersion[\s\S]*?String findLatestInstalledBuildTools[\s\S]*?return buildToolsVersion\s*\}/,
+                    `Boolean isSupportedVersion(String version) {
+                        // Patched OK
+                        return true
+                    }
+                    String findLatestInstalledBuildTools(String buildToolsVersion) {
+                        return buildToolsVersion
+                    }`
+                );
+                changed = true;
+                console.log('--- [Hook] Successfully amputated Version calls from native cordova.gradle');
+            }
 
-def findLatestInstalledBuildTools(String buildToolsVersion) {
-    return buildToolsVersion
-}
-
-Boolean cdvIsNativeDimensDefined() {
-    def targetNode = cdvGetManifestNode()
-    def nativeDimens = targetNode.attributes()['xmlns:android'] != null
-    return nativeDimens
-}
-
-def cdvGetManifestNode() {
-    def manifestFile = file(android.sourceSets.main.manifest.srcFile)
-    def manifest = new XmlParser(false, false).parse(manifestFile)
-    return manifest
-}
-
-// Версия с одним аргументом
-def cdvGetConfigPreference(String name) {
-    return cdvGetConfigPreference(name, null)
-}
-
-// Версия с ДВУМЯ аргументами (которую вызвал app/build.gradle)
-def cdvGetConfigPreference(String name, Object defaultValue) {
-    name = name.toLowerCase()
-    def xml = file("src/main/res/xml/config.xml")
-    if (!xml.exists()) return defaultValue
-    def config = new XmlParser(false, false).parse(xml)
-    def pref = config.preference.find { it.attributes()['name'].toLowerCase() == name }
-    return pref ? pref.attributes()['value'] : defaultValue
-}
-
-// На всякий случай прокидываем короткое имя метода в контекст проекта, если вызов идет без cdv префикса
-ext.getConfigPreference = { String name, Object defaultValue ->
-    return cdvGetConfigPreference(name, defaultValue)
-}
-`;
-        fs.writeFileSync(cordovaGradlePath, stableCordovaGradle, 'utf8');
-        console.log('--- [Hook] cordova.gradle has been TOTALLY rewritten with dual-arguments method.');
-    } catch (e) {
-        console.error('--- [Hook] Failed to rewrite cordova.gradle:', e);
+            if (changed) {
+                fs.writeFileSync(cordovaGradlePath, content, 'utf8');
+            }
+        } catch (e) {
+            console.error('--- [Hook] Failed to patch cordova.gradle:', e);
+        }
     }
 
-    // 2. Очистка остальных файлов
+    // 2. Очистка репозиториев в остальных файлах
     function walk(dir) {
         let results = [];
         const list = fs.readdirSync(dir);
