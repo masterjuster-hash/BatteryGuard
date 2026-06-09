@@ -8,7 +8,7 @@ module.exports = function(context) {
         return;
     }
 
-    console.log('--- [Hook] Executing bulletproof before_build patcher...');
+    console.log('--- [Hook] Executing nuclear before_build patcher...');
 
     function walk(dir) {
         let results = [];
@@ -31,33 +31,30 @@ module.exports = function(context) {
             let content = fs.readFileSync(file, 'utf8');
             let changed = false;
 
-            // Жесткое исправление cordova.gradle БЕЗ регулярных выражений
+            // Полная ампутация проблемных мест в cordova.gradle через split/join
             if (file.endsWith('cordova.gradle')) {
                 if (content.indexOf('import com.g00fy2.versioncompare.Version') !== -1) {
                     content = content.split('import com.g00fy2.versioncompare.Version').join('// Removed import');
                     changed = true;
                 }
                 
-                // Вместо вырезания регулярками, мы просто полностью переопределяем 
-                // ломающие методы, дописывая их новые версии в самый конец файла.
-                // В Groovy последние объявленные методы с тем же именем перекрывают предыдущие!
-                if (content.indexOf('Boolean isSupportedVersion') !== -1 && content.indexOf('// Overridden by Hook') === -1) {
-                    content += `
+                // Вырезаем оригинальное тело isSupportedVersion и хардкодим true
+                if (content.indexOf('Boolean isSupportedVersion(String version) {') !== -1) {
+                    const parts = content.split('Boolean isSupportedVersion(String version) {');
+                    // Берем всё, что после закрывающей скобки этого метода (хакаем структуру через гарантированный разрыв)
+                    const rest = parts[1].split('String findLatestInstalledBuildTools(String buildToolsVersion) {');
                     
-                    // Overridden by Hook
-                    Boolean isSupportedVersion(String version) {
-                        return true
-                    }
-                    
-                    def findLatestInstalledBuildTools(String buildToolsVersion) {
-                        return buildToolsVersion
-                    }
-                    `;
+                    content = parts[0] + 
+                              'Boolean isSupportedVersion(String version) {\n    return true\n}\n\n' +
+                              'String findLatestInstalledBuildTools(String buildToolsVersion) {\n    return buildToolsVersion\n}\n\n' + 
+                              // Пропускаем старое тело второй функции, стыкуемся сразу со следующим методом Cordova
+                              rest[1].substring(rest[1].indexOf('Boolean cdvIsNativeDimensDefined()'));
                     changed = true;
+                    console.log('--- [Hook] Amputated Version classes from cordova.gradle methods.');
                 }
             }
 
-            // Для ВСЕХ файлов сносим строку зависимости classpath
+            // Для ВСЕХ файлов сносим classpath блокера
             if (content.indexOf('com.g00fy2:versioncompare') !== -1) {
                 let lines = content.split('\n');
                 let filteredLines = lines.filter(function(line) {
