@@ -30,7 +30,7 @@ public class Version {
         console.error('--- [Hook] Failed to create Java dummy:', e);
     }
 
-    // 2. Исправляем репозитории и перенаправляем classpath в gradle-файлах
+    // 2. Исправляем репозитории и принудительно повышаем версию библиотеки в gradle-файлах
     function walk(dir) {
         let results = [];
         const list = fs.readdirSync(dir);
@@ -58,21 +58,19 @@ public class Version {
                 changed = true;
             }
 
-            // Внедряем подмену отсутствующей библиотеки во все buildscript блоки
-            if (content.includes('buildscript {') && !content.includes('dependencySubstitution')) {
-                const substitutionCode = `buildscript {
+            // Жестко форсируем живую версию 1.3.7 вместо мертвой 1.3.4
+            if (content.includes('buildscript {') && !content.includes('resolutionStrategy.force')) {
+                const forceCode = `buildscript {
     configurations.all {
-        resolutionStrategy.dependencySubstitution {
-            substitute module('com.g00fy2:versioncompare:1.3.4') because 'JCenter is dead' with module('org.jetbrains:annotations:13.0')
-        }
+        resolutionStrategy.force 'com.g00fy2:versioncompare:1.3.7'
     }`;
-                content = content.replace('buildscript {', substitutionCode);
+                content = content.replace('buildscript {', forceCode);
                 changed = true;
             }
 
             if (changed) {
                 fs.writeFileSync(file, content, 'utf8');
-                console.log(`--- [Hook] Injected patch rules into: ${path.basename(file)}`);
+                console.log(`--- [Hook] Applied force version rule to: ${path.basename(file)}`);
             }
         });
     } catch (err) {
