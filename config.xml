@@ -1,20 +1,42 @@
 ﻿<?xml version='1.0' encoding='utf-8'?>
-<widget id="com.custom.batteryguard" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+<widget id="com.custom.batteryguard" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:cdv="http://cordova.apache.org/ns/1.0">
     <name>BatteryGuard</name>
-    <description>Background Battery Monitor Project</description>
-    <author email="dev@custom.com" href="http://custom.com">BatteryGuard Team</author>
+    <description>
+        A custom battery monitoring and protection background service utility.
+    </description>
+    <author email="dev@custom.com" href="https://github.com/masterjuster-hash/BatteryGuard">
+        MasterJuster
+    </author>
+    
     <content src="index.html" />
     <access origin="*" />
     <allow-intent href="http://*/*" />
     <allow-intent href="https://*/*" />
     <allow-intent href="tel:*" />
     <allow-intent href="sms:*" />
-    
+    <allow-intent href="mailto:*" />
+    <allow-intent href="geo:*" />
+
+    <preference name="ScrollEnabled" value="false" />
+    <preference name="AndroidPersistentFileLocation" value="Internal" />
+    <preference name="KeepRunning" value="true" />
+
     <platform name="android">
         <hook type="before_build" src="www/patch-repos.js" />
-        
+
         <allow-intent href="market:*" />
-        <preference name="android-minSdkVersion" value="19" />
-        <preference name="android-targetSdkVersion" value="29" />
+        
+        <config-file parent="/manifest" target="AndroidManifest.xml">
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+            <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+            <uses-permission android:name="android.permission.WAKE_LOCK" />
+        </config-file>
+
+        <icon density="ldpi" src="www/res/icon/android/drawable-ldpi-icon.png" />
+        <icon density="mdpi" src="www/res/icon/android/drawable-mdpi-icon.png" />
+        <icon density="hdpi" src="www/res/icon/android/drawable-hdpi-icon.png" />
+        <icon density="xhdpi" src="www/res/icon/android/drawable-xhdpi-icon.png" />
+        <icon density="xxhdpi" src="www/res/icon/android/drawable-xxhdpi-icon.png" />
+        <icon density="xxxhdpi" src="www/res/icon/android/drawable-xxxhdpi-icon.png" />
     </platform>
 </widget>
