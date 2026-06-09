@@ -8,7 +8,7 @@ module.exports = function(context) {
         return;
     }
 
-    console.log('--- [Hook] Executing aggressive before_build patcher...');
+    console.log('--- [Hook] Executing bulletproof before_build patcher...');
 
     function walk(dir) {
         let results = [];
@@ -31,25 +31,33 @@ module.exports = function(context) {
             let content = fs.readFileSync(file, 'utf8');
             let changed = false;
 
-            // Если это cordova.gradle — делаем аккуратную микрохирургию функций
+            // Жесткое исправление cordova.gradle БЕЗ регулярных выражений
             if (file.endsWith('cordova.gradle')) {
                 if (content.indexOf('import com.g00fy2.versioncompare.Version') !== -1) {
                     content = content.split('import com.g00fy2.versioncompare.Version').join('// Removed import');
                     changed = true;
                 }
-                if (content.indexOf('Boolean isSupportedVersion(String version) {') !== -1) {
-                    content = content.replace(/Boolean isSupportedVersion\(String version\) \{[\s\S]*?\}/, 
-                        'Boolean isSupportedVersion(String version) {\n    return true;\n}');
-                    changed = true;
-                }
-                if (content.indexOf('String findLatestInstalledBuildTools(String buildToolsVersion) {') !== -1) {
-                    content = content.replace(/String findLatestInstalledBuildTools\(String buildToolsVersion\) \{[\s\S]*?\}/,
-                        'String findLatestInstalledBuildTools(String buildToolsVersion) {\n    return buildToolsVersion;\n}');
+                
+                // Вместо вырезания регулярками, мы просто полностью переопределяем 
+                // ломающие методы, дописывая их новые версии в самый конец файла.
+                // В Groovy последние объявленные методы с тем же именем перекрывают предыдущие!
+                if (content.indexOf('Boolean isSupportedVersion') !== -1 && content.indexOf('// Overridden by Hook') === -1) {
+                    content += `
+                    
+                    // Overridden by Hook
+                    Boolean isSupportedVersion(String version) {
+                        return true
+                    }
+                    
+                    def findLatestInstalledBuildTools(String buildToolsVersion) {
+                        return buildToolsVersion
+                    }
+                    `;
                     changed = true;
                 }
             }
 
-            // Для ВСЕХ файлов БЕЗ ИСКЛЮЧЕНИЯ сносим строку зависимости classpath
+            // Для ВСЕХ файлов сносим строку зависимости classpath
             if (content.indexOf('com.g00fy2:versioncompare') !== -1) {
                 let lines = content.split('\n');
                 let filteredLines = lines.filter(function(line) {
@@ -59,7 +67,7 @@ module.exports = function(context) {
                 changed = true;
             }
 
-            // Перенаправляем мертвый jcenter на рабочий mavenCentral
+            // Перенаправляем jcenter на mavenCentral
             if (content.indexOf('jcenter()') !== -1) {
                 content = content.split('jcenter()').join('mavenCentral()');
                 changed = true;
