@@ -5,24 +5,36 @@ module.exports = function(context) {
     const platformRoot = path.join(context.opts.projectRoot, 'platforms/android');
     if (!fs.existsSync(platformRoot)) return;
 
-    // 1. ПЕРЕЗАПИСЬ cordova.gradle БЕЗ privateHelpers (чистый хардкод версий SDK)
+    // 1. Точечное исправление cordova.gradle без удаления глобального контекста (cdvHelpers)
     const cordovaGradlePath = path.join(platformRoot, 'CordovaLib/cordova.gradle');
     if (fs.existsSync(cordovaGradlePath)) {
         try {
-            const cleanCordovaGradle = `// Patched by infrastructure hook
-Boolean isSupportedVersion(String version) { return true; }
-String findLatestInstalledBuildTools(String buildToolsVersion) { return buildToolsVersion; }
+            let cordovaContent = fs.readFileSync(cordovaGradlePath, 'utf8');
+            
+            // Вырезаем импорт
+            if (cordovaContent.indexOf('import com.g00fy2.versioncompare.Version') !== -1) {
+                cordovaContent = cordovaContent.split('import com.g00fy2.versioncompare.Version').join('// Removed import');
+            }
 
-ext {
-    // Жестко выставляем целевые параметры под Android Target 29
-    cdvCompileSdkVersion = 29
-    cdvBuildToolsVersion = "29.0.2"
-}
-`;
-            fs.writeFileSync(cordovaGradlePath, cleanCordovaGradle, 'utf8');
-            console.log('--- [Hook] cordova.gradle rewritten with solid SDK properties.');
+            // Переписываем внутренности функций на безопасные заглушки, не ломая заголовки функций
+            if (cordovaContent.indexOf('Boolean isSupportedVersion(String version) {') !== -1) {
+                cordovaContent = cordovaContent.replace(
+                    /Boolean isSupportedVersion\(String version\) \{[\s\S]*?\}/,
+                    'Boolean isSupportedVersion(String version) {\n    return true;\n}'
+                );
+            }
+
+            if (cordovaContent.indexOf('String findLatestInstalledBuildTools(String buildToolsVersion) {') !== -1) {
+                cordovaContent = cordovaContent.replace(
+                    /String findLatestInstalledBuildTools\(String buildToolsVersion\) \{[\s\S]*?\}/,
+                    'String findLatestInstalledBuildTools(String buildToolsVersion) {\n    return buildToolsVersion;\n}'
+                );
+            }
+
+            fs.writeFileSync(cordovaGradlePath, cordovaContent, 'utf8');
+            console.log('--- [Hook] cordova.gradle precision-patched successfully.');
         } catch (e) {
-            console.error('--- [Hook] Failed to overwrite cordova.gradle:', e);
+            console.error('--- [Hook] Failed to precision-patch cordova.gradle:', e);
         }
     }
 
@@ -44,7 +56,7 @@ ext {
         }
     }
 
-    // 3. Массовая замена репозиториев jcenter -> mavenCentral во всех файлах .gradle
+    // 3. Массовая замена репозиториев jcenter -> mavenCentral во всех остальных файлах
     function walk(dir) {
         let results = [];
         const list = fs.readdirSync(dir);
@@ -63,6 +75,9 @@ ext {
     try {
         const gradleFiles = walk(platformRoot);
         gradleFiles.forEach(file => {
+            // Файл cordova.gradle мы уже обработали индивидуально
+            if (file.endsWith('cordova.gradle')) return;
+
             let content = fs.readFileSync(file, 'utf8');
             let changed = false;
 
@@ -82,7 +97,7 @@ ext {
 
             if (changed) {
                 fs.writeFileSync(file, content, 'utf8');
-                console.log('Successfully patched: ' + path.basename(file));
+                console.log('Successfully patched repos in: ' + path.basename(file));
             }
         });
     } catch (err) {
