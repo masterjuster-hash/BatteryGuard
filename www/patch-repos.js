@@ -1,79 +1,65 @@
 ﻿const fs = require('fs');
 const path = require('path');
-const https = require('https');
 
-module.exports = function(context) {
-    const platformRoot = path.join(context.opts.projectRoot, 'platforms/android');
-    if (!fs.existsSync(platformRoot)) {
-        console.log('--- [Hook] Android platform root not found yet, skipping.');
-        return;
-    }
+console.log("--- [Hook] Starting Fixed-Dependency injection patcher...");
 
-    console.log('--- [Hook] Starting Fixed-Dependency injection patcher...');
+const androidFolder = path.join(__dirname, 'platforms', 'android');
 
-    const jarUrl = 'https://repo1.maven.org/maven2/com/g00fy2/versioncompare/1.3.4/versioncompare-1.3.4.jar';
-    const libsDir = path.join(platformRoot, 'libs');
-    const jarPath = path.join(libsDir, 'versioncompare-1.3.4.jar');
+if (!fs.existsSync(androidFolder)) {
+    console.log("--- [Hook] Android platform folder not found. Skipping.");
+    process.exit(0);
+}
 
-    if (!fs.existsSync(libsDir)) {
-        fs.mkdirSync(libsDir, { recursive: true });
-    }
-
-    console.log('--- [Hook] Downloading versioncompare.jar from Maven Central...');
+// 1. Правим cordova.gradle: убираем импорт и заменяем вызов Version
+const cordovaGradlePath = path.join(androidFolder, 'CordovaLib', 'cordova.gradle');
+if (fs.existsSync(cordovaGradlePath)) {
+    let content = fs.readFileSync(cordovaGradlePath, 'utf8');
     
-    const file = fs.createWriteStream(jarPath);
-    https.get(jarUrl, function(response) {
-        response.pipe(file);
-        file.on('finish', function() {
-            file.close();
-            console.log('--- [Hook] Successfully downloaded versioncompare-1.3.4.jar to libs/');
-            injectLocalRepo();
-        });
-    }).on('error', function(err) {
-        fs.unlink(jarPath, () => {});
-        console.error('--- [Hook] Failed to download JAR: ' + err.message);
-    });
+    // Убираем проблемный импорт
+    content = content.replace("import com.g00fy2.versioncompare.Version", "");
+    
+    // Заменяем логику сравнения версий на чистый Groovy (сравнение массивов чисел)
+    // Ищем строку, где создается объект Version
+    const oldTargetCheck = "Boolean isTargetSdkHigher = new Version(cdvTargetSdkVersion).isHigherThan(new Version(30))";
+    const newTargetCheck = "def parseVer = { String v -> v.replaceAll(/[^0-9.]/, '').split('\\\\.').collect { it ? it.toInteger() : 0 } };\n" +
+                           "        def targetVer = parseVer(cdvTargetSdkVersion);\n" +
+                           "        Boolean isTargetSdkHigher = targetVer && targetVer[0] > 30;";
+    
+    content = content.replace(oldTargetCheck, newTargetCheck);
+    
+    fs.writeFileSync(cordovaGradlePath, content, 'utf8');
+    console.log("--- [Hook] Successfully patched cordova.gradle (removed versioncompare dependency)");
+}
 
-    function injectLocalRepo() {
-        function walk(dir) {
-            let results = [];
-            const list = fs.readdirSync(dir);
-            list.forEach(file => {
-                file = path.join(dir, file);
-                const stat = fs.statSync(file);
-                if (stat && stat.isDirectory()) {
-                    results = results.concat(walk(file));
-                } else {
-                    if (file.endsWith('.gradle')) results.push(file);
-                }
-            });
-            return results;
-        }
+// 2. Исправляем репозитории во всех gradle файлах, заменяя jcenter и maven на безопасные зеркала
+const filesToPatch = [
+    path.join(androidFolder, 'repositories.gradle'),
+    path.join(androidFolder, 'app', 'repositories.gradle'),
+    path.join(androidFolder, 'CordovaLib', 'repositories.gradle'),
+    path.join(androidFolder, 'plugin-build.gradle')
+];
 
-        try {
-            const gradleFiles = walk(platformRoot);
-            gradleFiles.forEach(file => {
-                let content = fs.readFileSync(file, 'utf8');
-                let changed = false;
-
-                // ИСПРАВЛЕНО: Никаких BonaparteRoot, только чистый стандартный путь Gradle
-                if (content.indexOf('repositories {') !== -1 && content.indexOf('flatDir') === -1) {
-                    content = content.split('repositories {').join('repositories {\n        flatDir { dirs "${project.rootDir}/libs" }\n        mavenCentral()');
-                    changed = true;
-                }
-
-                if (content.indexOf('jcenter()') !== -1) {
-                    content = content.split('jcenter()').join('mavenCentral()');
-                    changed = true;
-                }
-
-                if (changed) {
-                    fs.writeFileSync(file, content, 'utf8');
-                    console.log('--- [Hook] Successfully patched repositories in: ' + path.basename(file));
-                }
-            });
-        } catch (err) {
-            console.error('--- [Hook] Error while injecting local repositories: ' + err);
-        }
+const secureRepositories = `
+    repositories {
+        maven { url "https://repo.maven.apache.org/maven2/" }
+        google()
+        maven { url "https://plugins.gradle.org/m2/" }
     }
-};
+`;
+
+filesToPatch.forEach(filePath => {
+    if (fs.existsSync(filePath)) {
+        let content = fs.readFileSync(filePath, 'utf8');
+        
+        // Очищаем старые блоки repositories
+        content = content.replace(/repositories\s*\{[\s\S]*?\}/g, '');
+        
+        // Вставляем наши безопасные репозитории в начало файла
+        content = secureRepositories + "\n" + content;
+        
+        fs.writeFileSync(filePath, content, 'utf8');
+        console.log(`--- [Hook] Successfully patched repositories in: ${path.basename(filePath)}`);
+    }
+});
+
+console.log("--- [Hook] Patching completed successfully.");
