@@ -27,20 +27,17 @@ jobs:
     - name: Install Cordova
       run: npm install -g cordova@10.0.0
 
-    # Твоя родная структура сборки, которую я зря сломал
-    - name: Build Project Structure
+    # Обычная последовательность: добавили платформу, запустили билд
+    # При вызове build Cordova сама прочитает config.xml и выполнит наш хук перед стартом Gradle
+    @RULE 1: STRICT COMPLETION
+    - name: Build Cordova Project
       run: |
-        cordova create build_dir com.custom.batteryguard BatteryGuard
-        rm -rf build_dir/www
-        cp -r www build_dir/
-        cp config.xml build_dir/config.xml
-        cd build_dir
         cordova platform add android@9.1.0
         cordova build android --debug
 
-    # Рабочий загрузчик v4, который заберет файл из папки build_dir
+    # Забираем APK из стандартного пути корневого проекта
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: app-debug
-        path: build_dir/platforms/android/app/build/outputs/apk/debug/app-debug.apk
+        path: platforms/android/app/build/outputs/apk/debug/app-debug.apk
