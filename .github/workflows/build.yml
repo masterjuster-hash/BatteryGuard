@@ -33,16 +33,18 @@ jobs:
     - name: Install Cordova
       run: npm install -g cordova@10.0.0
 
-    # Временно переключаем на 17 для создания платформы глобальным Gradle
+    # Оставляем Java 17 для создания платформы
     - name: Add Android Platform
       run: |
         export JAVA_HOME=$JAVA_HOME_17_X64
+        export PATH=$JAVA_HOME_17_X64/bin:$PATH
         cordova platform add android@9.1.0
 
-    # ПРИНУДИТЕЛЬНО возвращаем проверенную Java 8 для компиляции
+    # Жестко перехватываем PATH и JAVA_HOME для Java 8
     - name: Build APK
       run: |
         export JAVA_HOME=$JAVA_HOME_8_X64
+        export PATH=$JAVA_HOME_8_X64/bin:$PATH
         cordova build android --debug
 
     - name: Upload APK
