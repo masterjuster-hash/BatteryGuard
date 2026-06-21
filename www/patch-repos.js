@@ -10,20 +10,17 @@ if (!fs.existsSync(androidFolder)) {
     process.exit(1);
 }
 
-// 1. Исправление логики и зависимостей в cordova.gradle
+// 1. Исправление cordova.gradle (Тотальная зачистка versioncompare)
 const cordovaGradlePath = path.join(androidFolder, 'CordovaLib', 'cordova.gradle');
 if (fs.existsSync(cordovaGradlePath)) {
     let content = fs.readFileSync(cordovaGradlePath, 'utf8');
     
-    // Удаляем импорт
-    if (content.includes("import com.g00fy2.versioncompare.Version")) {
-        content = content.replace("import com.g00fy2.versioncompare.Version", "");
-    }
+    // Разбиваем файл на строки и полностью выбрасываем всё, где упоминается ломающая билд библиотека
+    let lines = content.split(/\r?\n/);
+    let filteredLines = lines.filter(line => !line.includes('versioncompare'));
+    content = filteredLines.join('\n');
     
-    // Удаляем саму зависимость из classpath, так как её больше нет в живых репозиториях
-    content = content.replace(/classpath\s+['"]com\.g00fy2:versioncompare:[\d.]+['"]/g, '');
-    
-    // Подменяем проверку на чистый Groovy без внешних библиотек
+    // Подменяем проверку на чистый Groovy без внешних плагинов
     const oldTargetCheck = "Boolean isTargetSdkHigher = new Version(cdvTargetSdkVersion).isHigherThan(new Version(30))";
     const newTargetCheck = "def parseVer = { String v -> v.replaceAll(/[^0-9.]/, '').split('\\\\.').collect { it ? it.toInteger() : 0 } };\n" +
                            "        def targetVer = parseVer(cdvTargetSdkVersion);\n" +
@@ -34,7 +31,7 @@ if (fs.existsSync(cordovaGradlePath)) {
     }
     
     fs.writeFileSync(cordovaGradlePath, content, 'utf8');
-    console.log("--- [Hook] Completely removed versioncompare dependency and logic from cordova.gradle.");
+    console.log("--- [Hook] Brute-force removed all versioncompare lines from cordova.gradle.");
 }
 
 // 2. Исправление репозиториев по всем файлам
