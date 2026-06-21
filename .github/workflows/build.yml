@@ -13,48 +13,26 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    # 1. Основная проверенная Java 8
-    - name: Set up JDK 8
+    # Ставим Java 11 — она идеальна: её понимает и Gradle, и Cordova 10+
+    - name: Set up JDK 11
       uses: actions/setup-java@v3
       with:
         distribution: 'zulu'
-        java-version: '8'
+        java-version: '11'
 
-    # 2. Ставим Java 17 (она запишется в переменную JAVA_HOME_17_X64)
-    - name: Set up JDK 17
-      uses: actions/setup-java@v3
-      with:
-        distribution: 'zulu'
-        java-version: '17'
-
+    # NodeJS 16 отлично подходит
     - name: Set up NodeJS
       uses: actions/setup-node@v3
       with:
         node-version: '16'
 
-    # 3. Перехватываем системный Gradle! 
-    # Мы подменяем оригинальный файл gradle скриптом, который запускает Gradle 9.5.1 строго под Java 17
-    - name: Patch System Gradle Executable
-      run: |
-        sudo mv /usr/share/gradle-9.5.1/bin/gradle /usr/share/gradle-9.5.1/bin/gradle.bak
-        sudo tee /usr/share/gradle-9.5.1/bin/gradle << 'EOF'
-        #!/bin/bash
-        export JAVA_HOME=$JAVA_HOME_17_X64
-        export PATH=$JAVA_HOME_17_X64/bin:$PATH
-        exec /usr/share/gradle-9.5.1/bin/gradle.bak "$@"
-        EOF
-        sudo chmod +x /usr/share/gradle-9.5.1/bin/gradle
-
     - name: Install Cordova
       run: npm install -g cordova@10.0.0
 
-    # 4. Чистый запуск. Система на Java 8, но когда Cordova вызовет системный gradle, 
-    # наш скрипт-перехватчик выполнит его под Java 17. Круг разорван физически.
+    # Ставим чистую cordova-android 10-й версии. Без костылей.
     - name: Build Cordova Project
       run: |
-        export JAVA_HOME=$JAVA_HOME_8_X64
-        export PATH=$JAVA_HOME_8_X64/bin:$PATH
-        cordova platform add android@9.1.0
+        cordova platform add android@10.1.2
         cordova build android --debug
 
     - name: Upload APK
