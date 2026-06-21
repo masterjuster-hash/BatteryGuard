@@ -36,9 +36,11 @@ jobs:
     - name: Build APK
       run: cordova build android --debug
 
-    # ИСПРАВЛЕННЫЙ ШАГ: Ищем APK по всему дереву папок
+    # Глобальный поиск APK по всему рабочему пространству
     - name: Upload APK
       uses: actions/upload-artifact@v3
       with:
         name: app-debug
-        path: build_dir/platforms/android/**/*.apk
+        path: |
+          **/*.apk
+          !node_modules/**/*.apk
