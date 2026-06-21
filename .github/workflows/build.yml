@@ -13,14 +13,12 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    # Сохраняем Java 8 как базовую
     - name: Set up JDK 8
       uses: actions/setup-java@v3
       with:
         distribution: 'zulu'
         java-version: '8'
 
-    # Подготавливаем Java 17 для временного переключения
     - name: Set up JDK 17
       uses: actions/setup-java@v3
       with:
@@ -35,17 +33,16 @@ jobs:
     - name: Install Cordova
       run: npm install -g cordova@10.0.0
 
-    # Шаг А: Добавляем платформу под Java 17 (чтобы проскочить ошибку Gradle 9.5.1)
-    # Переменная меняется локально внутри этого блока run
+    # Временно переключаем на 17 для создания платформы глобальным Gradle
     - name: Add Android Platform
       run: |
         export JAVA_HOME=$JAVA_HOME_17_X64
         cordova platform add android@9.1.0
 
-    # Шаг Б: Собираем проект. Здесь JAVA_HOME автоматически возвращается к Java 8.
-    # Cordova видит родную Java 8, проходит проверку требований и запускает локальный gradlew
+    # ПРИНУДИТЕЛЬНО возвращаем проверенную Java 8 для компиляции
     - name: Build APK
       run: |
+        export JAVA_HOME=$JAVA_HOME_8_X64
         cordova build android --debug
 
     - name: Upload APK
