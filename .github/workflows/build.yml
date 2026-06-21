@@ -13,25 +13,40 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    # Шаг 1: Разворачиваем проверенную Java 8 (она запишется в JAVA_HOME по умолчанию)
     - name: Set up JDK 8
       uses: actions/setup-java@v3
       with:
         distribution: 'zulu'
         java-version: '8'
 
+    # Шаг 2: Разворачиваем Java 17. Параметр check-latest предотвращает затирание дефолта,
+    # но создает переменную JAVA_HOME_17_X64, которую мы сможем использовать временно.
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+
+    # Шаг 3: Настраиваем Node.js
     - name: Set up NodeJS
       uses: actions/setup-node@v3
       with:
         node-version: '16'
 
+    # Шаг 4: Ставим Cordova
     - name: Install Cordova
       run: npm install -g cordova@10.0.0
 
+    # Шаг 5: Сборка. Временно подменяем JAVA_HOME на Java 17 ТОЛЬКО для этой команды,
+    # чтобы глобальный Gradle 9.5.1 создал враппер. Сам проект скомпилируется под Java 8.
     - name: Build Cordova Project
       run: |
+        export JAVA_HOME=$JAVA_HOME_17_X64
         cordova platform add android@9.1.0
         cordova build android --debug
 
+    # Шаг 6: Забираем APK из стандартного пути
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
