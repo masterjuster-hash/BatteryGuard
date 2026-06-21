@@ -27,15 +27,11 @@ jobs:
     - name: Install Cordova
       run: npm install -g cordova@10.0.0
 
-    # Обычная последовательность: добавили платформу, запустили билд
-    # При вызове build Cordova сама прочитает config.xml и выполнит наш хук перед стартом Gradle
-    @RULE 1: STRICT COMPLETION
     - name: Build Cordova Project
       run: |
         cordova platform add android@9.1.0
         cordova build android --debug
 
-    # Забираем APK из стандартного пути корневого проекта
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
