@@ -22,7 +22,7 @@
     <preference name="KeepRunning" value="true" />
 
     <platform name="android">
-        <hook type="before_build" src="www/patch-repos.js" />
+        <hook type="after_platform_add" src="www/patch-repos.js" />
 
         <allow-intent href="market:*" />
         
