@@ -1,7 +1,7 @@
 ﻿const fs = require('fs');
 const path = require('path');
 
-console.log("--- [Hook] Starting AGGRESSIVE Injection Patcher...");
+console.log("--- [Hook] Starting Precise Dependency Patcher...");
 
 const androidFolder = path.join(__dirname, '..', 'platforms', 'android');
 
@@ -10,7 +10,7 @@ if (!fs.existsSync(androidFolder)) {
     process.exit(1);
 }
 
-// 1. Избавляемся от versioncompare в cordova.gradle
+// 1. Исправление cordova.gradle (убираем старый versioncompare)
 const cordovaGradlePath = path.join(androidFolder, 'CordovaLib', 'cordova.gradle');
 if (fs.existsSync(cordovaGradlePath)) {
     let content = fs.readFileSync(cordovaGradlePath, 'utf8');
@@ -26,7 +26,7 @@ if (fs.existsSync(cordovaGradlePath)) {
     }
 }
 
-// 2. Полная зачистка jcenter() во всех файлах конфигурации
+// 2. Исправление репозиториев
 const filesToPatch = [
     path.join(androidFolder, 'repositories.gradle'),
     path.join(androidFolder, 'app', 'repositories.gradle'),
@@ -39,19 +39,18 @@ filesToPatch.forEach(filePath => {
     if (fs.existsSync(filePath)) {
         let content = fs.readFileSync(filePath, 'utf8');
         
-        // Тотальное удаление любого упоминания jcenter()
-        content = content.replace(/jcenter\s*\(\s*\)/g, '');
+        // Вместо удаления блоков, мы просто заменяем jcenter() и старые вызовы на mavenCentral() и google()
+        content = content.replace(/jcenter\s*\(\s*\)/g, 'mavenCentral()');
+        content = content.replace(/maven\s*\{\s*url\s*['"]https:\/\/dl\.bintray\.com[\s\S]*?\}\s*/g, '');
         
-        // Удаляем старые блоки репозиториев, если остались
-        content = content.replace(/repositories\s*\{[\s\S]*?\}/g, '');
-        
-        // Вшиваем чистые репозитории в самое начало файла
-        const secureRepositories = `\nrepositories {\n    maven { url "https://repo.maven.apache.org/maven2/" }\n    google()\n    maven { url "https://plugins.gradle.org/m2/" }\n}\n`;
-        content = secureRepositories + content;
+        // Явно гарантируем, что mavenCentral() присутствует во всех блоках repositories
+        if (content.includes('repositories {') && !content.includes('mavenCentral()')) {
+            content = content.replace(/repositories\s*\{/g, 'repositories {\n        mavenCentral()\n        google()');
+        }
         
         fs.writeFileSync(filePath, content, 'utf8');
-        console.log(`--- [Hook] Aggressively patched: ${path.basename(filePath)}`);
+        console.log(`--- [Hook] Metric patched: ${path.basename(filePath)}`);
     }
 });
 
-console.log("--- [Hook] Aggressive patching completed.");
+console.log("--- [Hook] Patching completed.");
