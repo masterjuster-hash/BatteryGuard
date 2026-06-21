@@ -1,60 +1,44 @@
-﻿name: Build BatteryGuard APK
+﻿name: Build Android APK
 
 on:
   push:
-    branches: [ main, master ]
-  workflow_dispatch:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Source Code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v3
 
-    - name: Set up JDK 8 (Strictly for Cordova 9)
-      uses: actions/setup-java@v4
+    - name: Set up JDK 8
+      uses: actions/setup-java@v3
       with:
         distribution: 'zulu'
         java-version: '8'
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
+    - name: Set up NodeJS
+      uses: actions/setup-node@v3
       with:
         node-version: '16'
 
-    - name: Install Compatible Gradle 7.1.1
-      run: |
-        wget -q https://services.gradle.org/distributions/gradle-7.1.1-bin.zip
-        sudo unzip -q gradle-7.1.1-bin.zip -d /opt
-        echo "/opt/gradle-7.1.1/bin" >> $GITHUB_PATH
+    - name: Install Cordova
+      run: npm install -g cordova@10.0.0
 
-    - name: Install Cordova and Tools
-      run: |
-        npm install -g cordova@10.0.0
+    - name: Install Project Dependencies
+      run: npm install
 
-    - name: Create Cordova Project and Build
-      run: |
-        gradle -v
-        
-        # 1. Создаем базовую структуру проекта
-        cordova create build_dir com.custom.batteryguard BatteryGuard
-        rm -rf build_dir/www
-        cp -r www build_dir/
-        cp config.xml build_dir/config.xml
-        
-        cd build_dir
-        
-        # 2. Добавляем платформу и плагин
-        cordova platform add android@9.1.0
-        cordova plugin add ../local-plugins/cordova-plugin-battery-guard --local
-        
-        # 3. Запускаем компиляцию (Хук вырежет лишнее и исправит репозитории)
-        cordova build android --debug
+    - name: Build Android Platform
+      run: cordova platform add android@9.1.0
 
-    - name: Upload Finished APK
-      uses: actions/upload-artifact@v4
+    - name: Build APK
+      run: cordova build android --debug
+
+    # ИСПРАВЛЕННЫЙ ШАГ: Ищем APK по всему дереву папок
+    - name: Upload APK
+      uses: actions/upload-artifact@v3
       with:
-        name: BatteryGuard-APK
-        path: build_dir/platforms/android/app/build/outputs/apk/debug/app-debug.apk
+        name: app-debug
+        path: build_dir/platforms/android/**/*.apk
